@@ -76,7 +76,7 @@ def get_betting_action_summary(game: TexasHoldEm) -> str:
 
 
 def create_comprehensive_prompt(
-    game: TexasHoldEm, player_id: int, model_personality: str = "balanced"
+    game: TexasHoldEm, player_id: int, model_personality: str = "balanced", hand_memory: List[Dict] = None
 ) -> str:
     """
     Create a comprehensive prompt for LLM decision making
@@ -137,6 +137,26 @@ def create_comprehensive_prompt(
             model_personality, personality_traits["balanced"]
         )
 
+        # Hand memory section
+        memory_section = ""
+        if hand_memory:
+            memory_section = "\n=== MY PREVIOUS ACTIONS THIS HAND ===\n"
+            for i, action in enumerate(hand_memory, 1):
+                phase = action.get("phase", "Unknown")
+                act = action.get("action", "Unknown")
+                amount = action.get("amount")
+                reasoning = action.get("reasoning", "No reasoning")
+                confidence = action.get("confidence", 0.5)
+                
+                if amount:
+                    memory_section += f"{i}. {phase}: {act} {amount} chips (Confidence: {confidence:.2f})\n"
+                    memory_section += f"   Reasoning: {reasoning}\n"
+                else:
+                    memory_section += f"{i}. {phase}: {act} (Confidence: {confidence:.2f})\n"
+                    memory_section += f"   Reasoning: {reasoning}\n"
+        else:
+            memory_section = "\n=== MY PREVIOUS ACTIONS THIS HAND ===\nNo previous actions taken this hand.\n"
+
         # Build the comprehensive prompt
         prompt = f"""POKER SITUATION ANALYSIS
 
@@ -161,7 +181,7 @@ Stack Ratio: {stack_ratio:.2f} (1.0 = full starting stack)
 
 === OPPONENTS ===
 {opponents}
-
+{memory_section}
 === AVAILABLE ACTIONS ===
 {", ".join(available_actions)}
 
@@ -175,6 +195,7 @@ Based on this comprehensive analysis, what action should you take? Consider:
 3. Position and opponent behavior
 4. Current betting phase and board texture
 5. Your playing style and image
+6. Your previous actions this hand and their outcomes
 
 Provide your decision with reasoning and confidence level."""
 
@@ -194,7 +215,7 @@ Available actions: {", ".join(available_actions) if "available_actions" in local
 Make your decision based on the available information. Error in analysis: {e}"""
 
 
-def create_simple_prompt(game: TexasHoldEm, player_id: int) -> str:
+def create_simple_prompt(game: TexasHoldEm, player_id: int, hand_memory: List[Dict] = None) -> str:
     """Create a simpler prompt for faster processing"""
     try:
         hole_cards = game.get_hand(player_id)
@@ -206,6 +227,15 @@ def create_simple_prompt(game: TexasHoldEm, player_id: int) -> str:
         moves = game.get_available_moves()
         actions = [action.name for action in moves.action_types]
 
+        # Simple memory section
+        memory_text = ""
+        if hand_memory:
+            memory_text = "\nPrevious actions: "
+            for action in hand_memory:
+                act = action.get("action", "Unknown")
+                phase = action.get("phase", "Unknown")
+                memory_text += f"{phase}:{act} "
+
         return f"""Texas Hold'em Decision:
 
 Your cards: {format_cards_for_prompt(hole_cards)}
@@ -213,7 +243,7 @@ Board: {format_cards_for_prompt(board_cards)}
 Phase: {phase}
 Your chips: {chips}
 To call: {to_call}
-Available: {", ".join(actions)}
+Available: {", ".join(actions)}{memory_text}
 
 What's your move?"""
 
@@ -222,10 +252,10 @@ What's your move?"""
 
 
 def create_personality_prompt(
-    game: TexasHoldEm, player_id: int, personality: str
+    game: TexasHoldEm, player_id: int, personality: str, hand_memory: List[Dict] = None
 ) -> str:
     """Create a prompt with specific personality traits"""
-    base_prompt = create_comprehensive_prompt(game, player_id, personality)
+    base_prompt = create_comprehensive_prompt(game, player_id, personality, hand_memory)
 
     personality_additions = {
         "aggressive": "\n\nRemember: You're an aggressive player who likes to bet and raise to put pressure on opponents.",

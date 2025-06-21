@@ -29,6 +29,11 @@ class LLMAgent:
         self.use_simple_prompts = use_simple_prompts
         self.decision_count = 0
         self.total_thinking_time = 0.0
+        
+        # Hand memory tracking
+        self.current_hand_actions = []  # Actions taken this hand
+        self.current_hand_phase = None  # Track phase changes
+        self.last_decision = None  # Last action we took
 
     def make_decision(self, game: TexasHoldEm) -> Tuple[ActionType, Optional[int]]:
         """Make a poker decision using the LLM"""
@@ -37,14 +42,17 @@ class LLMAgent:
         try:
             player_id = game.current_player
 
+            # Check if we've started a new hand and reset memory
+            self._update_hand_memory(game, player_id)
+
             # DEBUG: Print what model we're using
             print(f"🤖 LLM Agent ({self.model}) is thinking...")
 
-            # Create prompt based on settings
+            # Create prompt based on settings (now includes hand memory)
             if self.use_simple_prompts:
-                prompt = create_simple_prompt(game, player_id)
+                prompt = create_simple_prompt(game, player_id, self.current_hand_actions)
             else:
-                prompt = create_personality_prompt(game, player_id, self.personality)
+                prompt = create_personality_prompt(game, player_id, self.personality, self.current_hand_actions)
 
             # Get LLM decision
             decision = self.client.make_poker_decision(self.model, prompt)
@@ -100,6 +108,9 @@ class LLMAgent:
             self.decision_count += 1
             self.total_thinking_time += thinking_time
 
+            # Store this decision in memory
+            self._record_action(game, action, amount, reasoning, confidence)
+
             # Display LLM reasoning (optional)
             print(f"🤖 LLM Reasoning: {reasoning} (Confidence: {confidence:.2f})")
 
@@ -121,6 +132,58 @@ class LLMAgent:
                 print("❌ Falling back to FOLD")
                 return (ActionType.FOLD, None)
 
+    def _update_hand_memory(self, game: TexasHoldEm, player_id: int):
+        """Update hand memory tracking, reset if new hand started"""
+        current_phase = game.hand_phase
+        
+        # If this is a new hand (different from last phase or empty actions), reset memory
+        if (self.current_hand_phase != current_phase and 
+            current_phase.name == "PREFLOP" and 
+            self.current_hand_actions):
+            self._reset_hand_memory()
+        
+        self.current_hand_phase = current_phase
+
+    def _reset_hand_memory(self):
+        """Reset memory for a new hand"""
+        self.current_hand_actions = []
+        self.last_decision = None
+        print(f"🧠 {self.model} memory reset for new hand")
+
+    def _record_action(self, game: TexasHoldEm, action: ActionType, amount: Optional[int], reasoning: str, confidence: float):
+        """Record an action in hand memory"""
+        action_record = {
+            "phase": game.hand_phase.name,
+            "action": action.name,
+            "amount": amount,
+            "reasoning": reasoning,
+            "confidence": confidence,
+            "pot_size": sum(pot.get_total_amount() for pot in game.pots),
+            "chips_remaining": game.players[game.current_player].chips - (amount or 0),
+        }
+        
+        self.current_hand_actions.append(action_record)
+        self.last_decision = action_record
+
+    def get_hand_summary(self) -> str:
+        """Get a summary of actions taken this hand"""
+        if not self.current_hand_actions:
+            return "No actions taken this hand yet."
+        
+        summary = "My actions this hand:\n"
+        for i, action in enumerate(self.current_hand_actions, 1):
+            phase = action["phase"]
+            act = action["action"]
+            amount = action["amount"]
+            reasoning = action["reasoning"][:50] + "..." if len(action["reasoning"]) > 50 else action["reasoning"]
+            
+            if amount:
+                summary += f"  {i}. {phase}: {act} {amount} - {reasoning}\n"
+            else:
+                summary += f"  {i}. {phase}: {act} - {reasoning}\n"
+        
+        return summary
+
     def get_stats(self) -> Dict:
         """Get performance statistics"""
         avg_time = self.total_thinking_time / max(1, self.decision_count)
@@ -130,6 +193,7 @@ class LLMAgent:
             "average_thinking_time": avg_time,
             "model": self.model,
             "personality": self.personality,
+            "current_hand_actions": len(self.current_hand_actions),
         }
 
 

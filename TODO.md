@@ -565,9 +565,65 @@ The frontend is purely presentational - your FastAPI backend does all the heavy 
 
 Ready to start building? This TODO will create a beautiful, lightweight poker frontend that perfectly complements your robust FastAPI backend! 🃏✨
 
-## 🎮 PHASE 6: HUMAN PLAYER INTEGRATION (NEXT PRIORITY)
+---
 
-### 4.1 Human Input System
+## 🚀 PHASE 6: BACKEND FINALIZATION & CONSOLIDATION
+
+**Goal:** Make the FastAPI backend fully self-contained and capable of running entire game orchestrations, fully replacing the original CLI scripts.
+
+### 📋 **PHASE 6.1: Create a Self-Contained Backend**
+
+- [ ] **Migrate Core Logic into Backend:**
+  - Move essential logic from top-level `agent_manager.py`, `game_engine.py`, `hand_evaluator.py`, `llm_agents.py`, `prompt_builder.py`, `custom_agents.py`, and `human_player.py` into the `backend/app/` directory.
+  - A new `backend/app/poker_logic/` or `backend/app/lib/` subdirectory would be a good place for these.
+
+- [ ] **Eliminate `sys.path` Hacks:**
+  - Remove the `sys.path.append` hack from `game_manager.py`. The backend should use relative imports for all its internal modules.
+  - The goal is for the `backend/` directory to be a completely standalone application.
+
+### 📋 **PHASE 6.2: Full Game Orchestration**
+
+- [ ] **Implement Autonomous Game Runner:**
+  - Enhance `GameSession` or create a new "runner" service to automatically play through the configured `max_hands`.
+  - For games containing only AI/LLM agents, the service should automatically start the next hand after one concludes.
+  - This replaces the loop from the original `game_engine.run_full_game`.
+
+- [ ] **Handle Human-in-the-Loop Games:**
+  - For games with human players, the orchestrator should pause between hands.
+  - The existing `/games/{game_id}/next-hand` endpoint can serve as the trigger for the human player to continue to the next hand.
+
+### 📋 **PHASE 6.3: Formalize Game Results & Completion**
+
+- [ ] **Define Final Game State:**
+  - When a game reaches its end condition (e.g., `max_hands` reached, one player has all the chips), the `GameStatus` should be reliably set to `COMPLETED`.
+
+- [ ] **Add Final Results to Schema:**
+  - Create a `FinalRanking` schema.
+  - Add a `final_rankings: Optional[List[FinalRanking]]` field to the `GameState` schema.
+  - When the game is over, populate this field with a ranked list of players by final chip count.
+
+- [ ] **Broadcast Final Results:**
+  - The last WebSocket message for a completed game should contain the final state including the `final_rankings`.
+
+### 📋 **PHASE 6.4: Polish and Complete Features**
+
+- [ ] **Refine Human Player Joining:**
+  - Fully implement the `TODO` in the `POST /games/{game_id}/join` endpoint.
+  - Allow games to be created with open "human" slots.
+  - The `join` endpoint should properly assign a `player_name` and session ID to an available human `player_id`.
+
+- [ ] **Complete Health Checks:**
+  - Implement the `TODOs` in the `/health` endpoint in `backend/app/main.py` to add memory usage and uptime statistics.
+
+- [ ] **Verify Preset Configurations:**
+  - Perform a final review of all game modes from the original `main.py` (e.g., `run_llm_showcase`, `run_premium_vs_free`).
+  - Ensure every mode is accurately represented as a preset in `backend/app/core/config.py`.
+
+---
+
+## 🎮 PHASE 7: HUMAN PLAYER INTEGRATION (NEXT PRIORITY)
+
+### 7.1 Human Input System
 **Building on existing CLI framework**
 
 - [ ] **Create human player input functions:**
@@ -585,7 +641,7 @@ Ready to start building? This TODO will create a beautiful, lightweight poker fr
   - Clear action input prompts
   - Help system for poker rules
 
-### 4.2 Mixed Game Configuration
+### 7.2 Mixed Game Configuration
 **Extending agent_manager.py**
 
 - [ ] **Flexible game setup:**
@@ -642,17 +698,6 @@ Ready to start building? This TODO will create a beautiful, lightweight poker fr
 **Root Cause:** texasholdem package distributes pot to winner correctly but doesn't clear the pot afterward
 **Fix:** Simple `clear_phantom_pot_chips()` function clears phantom chips after hand completion
 **Impact:** ✅ Chip conservation restored, multi-hand games work perfectly, tests passing
-
----
-
-## PHASE 6: FASTAPI BACKEND FOR FRONTEND INTEGRATION (FUTURE)
-
-### 6.1 FastAPI Application Setup
-**Grounded in:** Game state properties and history system from documentation
-
-- [ ] **Core FastAPI application** with WebSocket support
-- [ ] **Real-time game state API** endpoints
-- [ ] **Performance analytics API** for frontend visualization
 
 ---
 

@@ -58,7 +58,7 @@ def display_human_game_state(
                 else Fore.RED
             )
             print(
-                f"💪 Hand Strength: {strength_color}{hand_strength:.1%}{Style.RESET_ALL}"
+                f"💪 Hand Strength: {strength_color}{hand_strength:.2f}{Style.RESET_ALL}"
             )
         except:
             pass
@@ -139,9 +139,23 @@ def get_available_actions_display(game: TexasHoldEm, player_id: int) -> List[str
             chips_to_call = game.chips_to_call(player_id)
             available_actions.append(f"CALL ({chips_to_call})")
         elif action == ActionType.RAISE:
-            min_raise = game.min_raise()
-            max_chips = game.players[player_id].chips
-            available_actions.append(f"RAISE ({min_raise}-{max_chips})")
+            # Use the actual raise range instead of misleading min_raise()
+            try:
+                raise_range = moves.raise_range
+                if raise_range:
+                    min_raise_actual = min(raise_range)
+                    max_chips = game.players[player_id].chips
+                    available_actions.append(f"RAISE ({min_raise_actual}-{max_chips})")
+                else:
+                    # Fallback if no raise range available
+                    min_raise = game.min_raise()
+                    max_chips = game.players[player_id].chips
+                    available_actions.append(f"RAISE ({min_raise}-{max_chips})")
+            except:
+                # Final fallback
+                min_raise = game.min_raise()
+                max_chips = game.players[player_id].chips
+                available_actions.append(f"RAISE ({min_raise}-{max_chips})")
 
     return available_actions
 
@@ -222,6 +236,21 @@ def get_human_action(
 
             elif action_str in ["r", "raise"]:
                 if ActionType.RAISE in moves.action_types:
+                    # Get the actual valid raise range
+                    try:
+                        raise_range = moves.raise_range
+                        if raise_range:
+                            min_raise_actual = min(raise_range)
+                            max_raise_actual = max(raise_range)
+                        else:
+                            # Fallback to old method if raise_range not available
+                            min_raise_actual = game.min_raise()
+                            max_raise_actual = game.players[player_id].chips
+                    except:
+                        # Final fallback
+                        min_raise_actual = game.min_raise()
+                        max_raise_actual = game.players[player_id].chips
+
                     # Get raise amount
                     if len(parts) > 1:
                         try:
@@ -232,11 +261,9 @@ def get_human_action(
                             )
                             continue
                     else:
-                        # Prompt for amount
-                        min_raise = game.min_raise()
-                        max_chips = game.players[player_id].chips
+                        # Prompt for amount with correct range
                         amount_input = input(
-                            f"Raise amount ({min_raise}-{max_chips}): "
+                            f"Raise amount ({min_raise_actual}-{max_raise_actual}): "
                         )
                         try:
                             amount = int(amount_input)
@@ -248,10 +275,8 @@ def get_human_action(
                     if game.validate_move(player_id, ActionType.RAISE, amount):
                         return ActionType.RAISE, amount
                     else:
-                        min_raise = game.min_raise()
-                        max_chips = game.players[player_id].chips
                         print(
-                            f"{Fore.RED}❌ Invalid raise. Must be {min_raise}-{max_chips}{Style.RESET_ALL}"
+                            f"{Fore.RED}❌ Invalid raise. Must be {min_raise_actual}-{max_raise_actual}{Style.RESET_ALL}"
                         )
                 else:
                     print(f"{Fore.RED}❌ RAISE not available{Style.RESET_ALL}")
@@ -363,7 +388,7 @@ def display_showdown_results(game: TexasHoldEm, debug_mode: bool = True):
             try:
                 if game.board:
                     hand_strength = evaluate_hand_strength(game, player_id)
-                    strength_str = f" (Strength: {hand_strength:.1%})"
+                    strength_str = f" (Strength: {hand_strength:.2f})"
                 else:
                     strength_str = ""
             except:

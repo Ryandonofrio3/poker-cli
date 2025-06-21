@@ -62,6 +62,27 @@ del moves[ActionType.FOLD]  # ❌ Tries to use ActionType enum as list index
 **Fix:** Simple `clear_phantom_pot_chips()` function that clears pot after hand completion
 **Result:** ✅ Chip conservation restored, multi-hand games work perfectly
 
+### ✅ Bug #4: texasholdem Package - Raise Validation Inconsistency
+**Date:** January 18, 2025  
+**Status:** ✅ Fixed with raise range validation  
+**Issue:** `game.min_raise()` returns misleading minimum raise amounts that don't match actual validation
+**Impact:** Human player interface showed incorrect raise minimums, causing all raises to be rejected preflop
+**Root Cause:** 
+- `game.min_raise()` returns theoretical minimum (e.g., 20)
+- But `moves.raise_range` shows actual valid range (e.g., 40-1000)
+- `game.validate_move()` uses the actual range, not the min_raise() value
+**Evidence:** 
+```
+min_raise() returns: 20
+raise_range: range(40, 1001)  
+validate_move(RAISE, 20): False ❌
+validate_move(RAISE, 40): True ✅
+```
+**Fix:** Updated `human_player.py` to use `moves.raise_range` instead of `game.min_raise()`
+- `get_available_actions_display()` now shows correct minimum (40 vs 20)
+- Raise prompts and error messages use actual valid range
+**Result:** ✅ Human raises now work correctly, interface shows accurate information
+
 ---
 
 ## 🎉 Major Milestones Achieved
@@ -111,11 +132,46 @@ del moves[ActionType.FOLD]  # ❌ Tries to use ActionType enum as list index
 - ✅ **Strategic Reasoning Display** - LLMs explain their decisions!
 - ✅ **Error Handling & Validation** - Robust fallbacks to call_agent
 - ✅ **Performance Tracking** - Decision times and statistics
+- ✅ **Hand Memory System** - LLMs remember their actions within each hand!
 
 **Example LLM Reasoning:**
 ```
 🤖 LLM Reasoning: With a weak hand (2♥ 3♣) and low win probability (20%) from early position, calling 40 chips is not justified despite pot odds. Raising is too risky given hand strength and position. Folding preserves chips for better spots. (Confidence: 0.90)
 ```
+
+### ✅ Hand Memory System Implementation (January 18, 2025)
+**LLM Agents Now Have Context Awareness!**
+
+**Memory Features:**
+- ✅ **Action Tracking** - Each LLM agent remembers all actions taken in current hand
+- ✅ **Phase Awareness** - Tracks which phase each action was taken in
+- ✅ **Decision Context** - Stores reasoning and confidence for each action
+- ✅ **Automatic Reset** - Memory clears when new hand starts
+- ✅ **Rich Prompts** - Hand history included in LLM decision prompts
+
+**Memory Structure:**
+```python
+{
+    "phase": "PREFLOP",
+    "action": "RAISE", 
+    "amount": 50,
+    "reasoning": "Strong hand warrants aggressive play",
+    "confidence": 0.85,
+    "pot_size": 100,
+    "chips_remaining": 950
+}
+```
+
+**Example Memory in Prompt:**
+```
+=== MY PREVIOUS ACTIONS THIS HAND ===
+1. PREFLOP: CALL (Confidence: 0.75)
+   Reasoning: Good starting hand, worth seeing the flop
+2. FLOP: RAISE 50 chips (Confidence: 0.90)
+   Reasoning: Strong top pair, betting for value
+```
+
+**Impact:** LLMs can now make much better decisions by understanding their previous actions and how the hand has developed! 🧠🎯
 
 ---
 
@@ -241,6 +297,8 @@ CONFIDENCE: 0.85
 - **Zero Crashes** with comprehensive error handling
 - **Sub-second Response Times** for all agent types
 - **Structured Outputs** working perfectly with GPT-4.1
+- **Hand Memory System** - LLMs track and learn from their own actions
+- **4 Major Library Bugs** discovered and fixed
 
 ### ✅ User Experience:
 - **Beautiful CLI Interface** with colors and emojis
