@@ -4,7 +4,6 @@ Welcome to the Texas Hold'em Poker CLI, a sophisticated command-line interface w
 
 This project uses the `texasholdem` library to create a robust poker environment and integrates with modern AI and LLM technologies to bring unique, intelligent opponents to life.
 
-![Poker CLI Screenshot](https://i.imgur.com/your-screenshot.png) <!-- Replace with an actual screenshot -->
 
 ## ✨ Features
 
